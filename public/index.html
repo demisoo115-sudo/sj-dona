@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0f172a"><link rel="manifest" href="/manifest.webmanifest">
+<title>SJ DONA</title>
+<style>
+:root{--bg:#f5f7fb;--card:#fff;--ink:#0f172a;--muted:#64748b;--line:#e2e8f0;--blue:#2563eb;--green:#059669;--amber:#d97706}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);font-family:system-ui,-apple-system,Segoe UI,Roboto,"Noto Sans KR",sans-serif;color:var(--ink)}
+.app{max-width:900px;margin:auto;padding:14px 14px 98px}.top{display:flex;justify-content:space-between;align-items:center}.brand h1{margin:0;font-size:23px}.brand p{margin:3px 0 0;font-size:12px;color:var(--muted)}
+.pill{font-size:10px;font-weight:900;padding:7px 9px;border-radius:999px;background:#e0e7ff;color:#3730a3}.hero{margin-top:14px;border-radius:24px;padding:20px;background:linear-gradient(135deg,#0f172a,#1e293b);color:#fff;box-shadow:0 12px 28px #0f172a20}
+.hero h2{margin:0 0 7px;font-size:22px}.hero p{white-space:pre-wrap;margin:0;color:#d1d5db;line-height:1.55}
+.row{display:flex;gap:8px;flex-wrap:wrap}.hero .row{margin-top:13px}.btn{border:0;border-radius:12px;padding:10px 13px;font-weight:800;cursor:pointer}.dark{background:#0f172a;color:#fff}.blue{background:var(--blue);color:#fff}.light{background:#eef2f7;color:var(--ink)}
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:9px;margin-top:12px}.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:14px;box-shadow:0 4px 15px #00000008}.card h3{margin:0 0 7px;font-size:14px}.stat{font-size:25px;font-weight:900}.small{font-size:12px;color:var(--muted)}
+.section{margin-top:16px}.head{display:flex;justify-content:space-between;align-items:center;margin:0 2px 8px}.head h2{font-size:17px;margin:0}
+input,textarea,select{width:100%;border:1px solid var(--line);border-radius:12px;padding:11px;background:#fff;font:inherit}textarea{min-height:94px;resize:vertical}
+.voice{display:flex;align-items:center;gap:10px;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:15px;padding:12px}.mic{width:48px;height:48px;border:0;border-radius:50%;background:#0f172a;color:white;font-size:20px}.mic.on{animation:pulse 1s infinite}@keyframes pulse{50%{transform:scale(1.08);box-shadow:0 0 0 8px #2563eb20}}
+.answer{margin-top:10px;min-height:90px;background:#f8fafc;border-radius:14px;padding:13px;white-space:pre-wrap;line-height:1.6}
+.item{display:flex;gap:9px;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--line)}.item:last-child{border-bottom:0}.grow{flex:1}.x{border:0;background:none;color:#94a3b8}
+.badge{font-size:10px;font-weight:800;padding:4px 7px;border-radius:999px;background:#eef2ff;color:#3730a3}.good{background:#ecfdf5;color:#047857}.warn{background:#fff7ed;color:#c2410c}
+.quick{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}.quick button{background:white;border:1px solid var(--line);border-radius:14px;padding:12px;text-align:left}.quick b{display:block}.quick span{font-size:11px;color:var(--muted)}
+.bottom{position:fixed;left:0;right:0;bottom:0;background:#fffffff2;backdrop-filter:blur(10px);border-top:1px solid var(--line);padding:7px 8px calc(7px + env(safe-area-inset-bottom));z-index:20}.bottom>div{max-width:900px;margin:auto;display:grid;grid-template-columns:repeat(5,1fr)}.nav{border:0;background:none;padding:6px 2px;font-size:10px;color:#475569}.nav b{display:block;font-size:18px}
+@media(min-width:720px){.grid{grid-template-columns:repeat(4,1fr)}.quick{grid-template-columns:repeat(4,1fr)}}
+</style></head>
+<body>
+<div class="app">
+<div class="top"><div class="brand"><h1>SJ DONA</h1><p id="today"></p></div><span class="pill" id="status">CHECKING</span></div>
+
+<section id="home" class="hero"><h2>오늘의 매니저 브리핑</h2><p id="brief">브리핑을 불러오는 중입니다.</p><div class="row"><button class="btn blue" onclick="getBrief()">새로 브리핑</button><button class="btn light" onclick="speak(document.getElementById('brief').innerText)">🔊 읽어줘</button></div></section>
+
+<div class="grid">
+<div class="card"><h3>미완료</h3><div class="stat" id="taskCount">0</div><div class="small">할 일</div></div>
+<div class="card"><h3>오늘 일정</h3><div class="stat" id="eventCount">0</div><div class="small">앱 일정</div></div>
+<div class="card"><h3>중요 업무</h3><div class="stat" id="importantCount">0</div><div class="small">우선 처리</div></div>
+<div class="card"><h3>Google</h3><div class="stat" id="googleStat">OFF</div><div class="small">Workspace</div></div>
+</div>
+
+<section class="section" id="ai"><div class="head"><h2>DONA에게 말하기</h2><span class="badge good">EXECUTIVE AI</span></div><div class="card">
+<div class="voice"><button id="mic" class="mic" onclick="listen()">🎙</button><div><b>말로 지시하세요</b><div class="small">예: “오늘 뭐부터 해야 해?” “중요한 메일과 일정 확인해줘”</div></div></div>
+<textarea id="prompt" placeholder="또는 직접 입력하세요." style="margin-top:10px"></textarea>
+<div class="row" style="margin-top:8px"><button class="btn dark" onclick="ask()">DONA 실행</button><button class="btn light" onclick="setPrompt('이번 주 중요 업무와 마감 일정을 정리해줘')">이번 주 정리</button></div>
+<div id="answer" class="answer">무엇을 도와드릴까요?</div>
+</div></section>
+
+<section class="section" id="tasksSec"><div class="head"><h2>할 일</h2></div><div class="card">
+<div class="row"><select id="cat" style="max-width:130px"><option>사업</option><option>DE’CAFREE</option><option>수출</option><option>정부지원</option><option>직원</option><option>개인</option></select><select id="priority" style="max-width:100px"><option>보통</option><option>중요</option></select></div>
+<div class="row" style="margin-top:8px"><input id="taskText" placeholder="할 일을 입력하세요"><button class="btn dark" onclick="addTask()">추가</button></div><div id="tasks"></div>
+</div></section>
+
+<section class="section" id="calSec"><div class="head"><h2>일정</h2></div><div class="card">
+<div class="row"><input id="eventDate" type="date"><input id="eventTime" type="time"></div>
+<div class="row" style="margin-top:8px"><input id="eventText" placeholder="일정 내용"><button class="btn dark" onclick="addEvent()">저장</button></div><div id="events"></div>
+</div></section>
+
+<section class="section" id="workSec"><div class="head"><h2>전문 업무센터</h2></div><div class="quick">
+<button onclick="quick('SJ GLOBAL 사업의 오늘 우선순위와 다음 행동을 정리해줘')"><b>SJ GLOBAL</b><span>사업 · 확장 · 의사결정</span></button>
+<button onclick="quick('DE’CAFREE 매장의 오늘 운영 점검사항을 알려줘')"><b>DE’CAFREE</b><span>매장 · 직원 · 재고 · 매출</span></button>
+<button onclick="quick('수출·물류 진행에 필요한 서류와 누락 위험을 점검해줘')"><b>수출·물류</b><span>CI · PL · AWB/B/L · 정산</span></button>
+<button onclick="quick('정부지원사업의 마감, 제출서류, 보완사항을 점검해줘')"><b>정부지원</b><span>마감 · 보완 · 정산</span></button>
+<button onclick="quick('직원 스케줄과 관리상 확인해야 할 일을 정리해줘')"><b>직원</b><span>스케줄 · 교육 · 급여</span></button>
+<button onclick="quick('내 개인 일정과 사업 일정의 충돌을 확인해줘')"><b>개인생활</b><span>일정 · 연락 · 생활</span></button>
+<button onclick="quick('최근 중요한 이메일을 정리하고 답장 또는 후속조치가 필요한 것을 알려줘')"><b>Gmail</b><span>중요 메일 · 후속조치</span></button>
+<button onclick="quick('최근 Drive 문서와 향후 Calendar 일정을 같이 보고 준비해야 할 것을 알려줘')"><b>Drive + Calendar</b><span>자료 · 회의 · 준비</span></button>
+</div></section>
+
+<section class="section" id="googleSec"><div class="head"><h2>Google Workspace</h2><span id="googleBadge" class="badge warn">미연결</span></div><div class="card">
+<div class="row"><button class="btn blue" onclick="location.href='/auth/google'">Google 연결</button><button class="btn light" onclick="loadWorkspace()">새로고침</button><button class="btn light" onclick="disconnectGoogle()">연결 해제</button></div>
+<div id="workspace" class="answer">Gmail, Calendar, Drive를 연결하면 DONA가 실제 일정·메일·문서를 참고할 수 있습니다.</div>
+</div></section>
+
+<section class="section" id="profileSec"><div class="head"><h2>DONA 기억 / 설정</h2></div><div class="card">
+<textarea id="profile" placeholder="DONA가 계속 참고할 개인/사업 기본정보를 적으세요. 예: 이번 달 최우선 목표, 자주 쓰는 업무 원칙, 중요한 프로젝트"></textarea>
+<div class="row" style="margin-top:8px"><button class="btn dark" onclick="saveProfile()">기억 저장</button><input id="briefTime" type="time" style="max-width:130px"><button class="btn light" onclick="enableNotify()">알림 허용</button></div>
+<p class="small">브리핑 시간은 앱이 실행 중일 때 브라우저 알림에 사용됩니다. 완전한 백그라운드 푸시는 별도 푸시 서버 구성이 필요합니다.</p>
+</div></section>
+</div>
+
+<div class="bottom"><div>
+<button class="nav" onclick="go('home')"><b>⌂</b>홈</button><button class="nav" onclick="go('ai')"><b>✦</b>DONA</button><button class="nav" onclick="go('tasksSec')"><b>✓</b>할 일</button><button class="nav" onclick="go('calSec')"><b>◫</b>일정</button><button class="nav" onclick="go('workSec')"><b>▦</b>업무</button>
+</div></div>
+
+<script>
+let state={tasks:[],events:[],notes:[],profile:{},settings:{briefTime:"08:00"}};
+const $=id=>document.getElementById(id);
+$("today").textContent=new Intl.DateTimeFormat("ko-KR",{dateStyle:"full"}).format(new Date());
+$("eventDate").value=new Date().toISOString().slice(0,10);
+
+async function api(url,opt={}){const r=await fetch(url,{headers:{"Content-Type":"application/json"},...opt});const j=await r.json();if(!r.ok)throw new Error(j.error||"요청 실패");return j}
+async function load(){
+  state=await api("/api/state"); state.tasks??=[];state.events??=[];state.profile??={};state.settings??={briefTime:"08:00"};
+  $("profile").value=state.profile.memory||"";$("briefTime").value=state.settings.briefTime||"08:00";
+  render(); status(); getBrief(); loadWorkspace();
+}
+async function save(){await api("/api/state",{method:"POST",body:JSON.stringify(state)})}
+function render(){
+  $("tasks").innerHTML=state.tasks.map((x,i)=>`<div class="item"><input style="width:auto;margin-top:3px" type="checkbox" ${x.done?"checked":""} onchange="toggleTask(${i})"><div class="grow"><span class="badge">${esc(x.cat)}</span> ${x.priority==="중요"?'<span class="badge warn">중요</span>':""} <b style="${x.done?'text-decoration:line-through;color:#94a3b8':''}">${esc(x.text)}</b></div><button class="x" onclick="delTask(${i})">✕</button></div>`).join("");
+  $("events").innerHTML=state.events.map((x,i)=>`<div class="item"><div class="grow"><b>${x.date} ${x.time||""}</b> · ${esc(x.text)}</div><button class="x" onclick="delEvent(${i})">✕</button></div>`).join("");
+  const open=state.tasks.filter(x=>!x.done),today=new Date().toISOString().slice(0,10);
+  $("taskCount").textContent=open.length;$("importantCount").textContent=open.filter(x=>x.priority==="중요").length;$("eventCount").textContent=state.events.filter(x=>x.date===today).length;
+}
+function esc(s){return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]))}
+async function addTask(){const t=$("taskText").value.trim();if(!t)return;state.tasks.unshift({text:t,cat:$("cat").value,priority:$("priority").value,done:false,created:new Date().toISOString()});$("taskText").value="";await save();render()}
+async function toggleTask(i){state.tasks[i].done=!state.tasks[i].done;await save();render()}
+async function delTask(i){state.tasks.splice(i,1);await save();render()}
+async function addEvent(){const d=$("eventDate").value,t=$("eventText").value.trim();if(!d||!t)return;state.events.push({date:d,time:$("eventTime").value,text:t});state.events.sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time));$("eventText").value="";await save();render()}
+async function delEvent(i){state.events.splice(i,1);await save();render()}
+async function saveProfile(){state.profile.memory=$("profile").value;state.settings.briefTime=$("briefTime").value||"08:00";await save();alert("DONA 기억과 설정을 저장했습니다.")}
+async function ask(){const q=$("prompt").value.trim();if(!q)return;$("answer").textContent="DONA가 확인 중입니다…";try{const j=await api("/api/ai",{method:"POST",body:JSON.stringify({message:q})});$("answer").textContent=j.text||"답변이 없습니다.";speak(j.text||"")}catch(e){$("answer").textContent="연결 설정이 필요합니다: "+e.message}}
+function setPrompt(t){$("prompt").value=t}
+function quick(t){$("prompt").value=t;go("ai");ask()}
+function go(id){$(id).scrollIntoView({behavior:"smooth",block:"start"})}
+async function getBrief(){try{const j=await api("/api/brief");$("brief").textContent=j.text||""}catch(e){$("brief").textContent="브리핑 연결을 확인해 주세요: "+e.message}}
+function speak(t){if(!t||!("speechSynthesis"in window))return;speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(t);u.lang="ko-KR";speechSynthesis.speak(u)}
+function listen(){const SR=window.SpeechRecognition||window.webkitSpeechRecognition;if(!SR)return alert("Chrome 음성인식을 사용할 수 없습니다.");const r=new SR();r.lang="ko-KR";$("mic").classList.add("on");r.onresult=e=>{$("prompt").value=e.results[0][0].transcript;$("mic").classList.remove("on");ask()};r.onend=()=>$("mic").classList.remove("on");r.start()}
+async function status(){try{const s=await api("/api/status");$("status").textContent=(s.openai?"AI ON":"AI OFF")+" · "+(s.google?"GOOGLE ON":"GOOGLE OFF");$("googleStat").textContent=s.google?"ON":"OFF";$("googleBadge").textContent=s.google?"연결됨":"미연결";$("googleBadge").className="badge "+(s.google?"good":"warn")}catch{}}
+async function loadWorkspace(){try{const w=await api("/api/workspace");if(!w.connected){$("workspace").textContent="Google 계정을 연결해 주세요.";return}let out=`최근 메일 ${w.gmail.length}건 · 향후 일정 ${w.calendar.length}건 · 최근 Drive 파일 ${w.drive.length}건\n\n`;out+="[최근 메일]\n"+w.gmail.slice(0,5).map(x=>"• "+(x.subject||x.error)).join("\n");out+="\n\n[향후 Calendar]\n"+w.calendar.slice(0,5).map(x=>"• "+(x.start||"")+" "+(x.summary||x.error)).join("\n");out+="\n\n[최근 Drive]\n"+w.drive.slice(0,5).map(x=>"• "+(x.name||x.error)).join("\n");$("workspace").textContent=out;status()}catch(e){$("workspace").textContent=e.message}}
+async function disconnectGoogle(){await api("/api/google/disconnect",{method:"POST",body:"{}"});$("workspace").textContent="Google 연결이 해제되었습니다.";status()}
+async function enableNotify(){if(!("Notification"in window))return alert("이 브라우저는 알림을 지원하지 않습니다.");const p=await Notification.requestPermission();alert(p==="granted"?"알림을 허용했습니다.":"알림이 허용되지 않았습니다.")}
+setInterval(()=>{const bt=state.settings.briefTime||"08:00",d=new Date(),hh=String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0");if(hh===bt&&Notification.permission==="granted"){const k="brief-"+d.toISOString().slice(0,10);if(localStorage.getItem(k)!=="1"){new Notification("SJ DONA",{body:"오늘 브리핑을 확인할 시간입니다."});localStorage.setItem(k,"1")}}},60000);
+if("serviceWorker"in navigator)navigator.serviceWorker.register("/service-worker.js").catch(()=>{});
+load();
+</script></body></html>
