@@ -212,4 +212,4 @@ app.get("/api/brief",async(req,res)=>{
   }catch(e){res.status(500).json({error:e.message})}
 });
 
-app.listen(PORT,()=>console.log(`SJ DONA running at ${BASE}`));
+app.listen(PORT, "0.0.0.0", () => console.log(`SJ DONA running at ${BASE}`));
