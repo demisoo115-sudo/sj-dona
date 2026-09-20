@@ -1,14 +1,5 @@
 {
-  "name": "sj-dona-complete",
-  "version": "1.0.0",
-  "private": true,
-  "type": "module",
-  "scripts": {
-    "start": "node server.js"
-  },
-  "dependencies": {
-    "express": "^5.1.0",
-    "googleapis": "^159.0.0",
-    "dotenv": "^17.2.2"
-  }
+  "name":"sj-dona","version":"2.1.0","private":true,"type":"module",
+  "scripts":{"start":"node server.js"},
+  "dependencies":{"dotenv":"^16.4.7","express":"^4.21.2","googleapis":"^144.0.0","multer":"^1.4.5-lts.1"}
 }
