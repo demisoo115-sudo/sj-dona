@@ -105,7 +105,7 @@ async function delTask(i){state.tasks.splice(i,1);await save();render()}
 async function addEvent(){const d=$("eventDate").value,t=$("eventText").value.trim();if(!d||!t)return;state.events.push({date:d,time:$("eventTime").value,text:t});state.events.sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time));$("eventText").value="";await save();render()}
 async function delEvent(i){state.events.splice(i,1);await save();render()}
 async function saveProfile(){state.profile.memory=$("profile").value;state.settings.briefTime=$("briefTime").value||"08:00";await save();alert("DONA 기억과 설정을 저장했습니다.")}
-async function ask(){const q=$("prompt").value.trim();if(!q)return;$("answer").textContent="DONA가 확인 중입니다…";try{const j=await api("/api/ai",{method:"POST",body:JSON.stringify({message:q})});$("answer").textContent=j.text||"답변이 없습니다.";speak(j.text||"")}catch(e){$("answer").textContent="연결 설정이 필요합니다: "+e.message}}
+async function ask(){const q=$("prompt").value.trim();if(!q)return;$("answer").textContent="DONA가 Gmail, 일정, Drive와 업무를 확인하고 있습니다...";try{let context="";try{const w=await api("/api/workspace");context=`\n\n[Google Workspace 실시간 정보]\n최근 Gmail: ${JSON.stringify(w.gmail||[])}\n향후 Calendar: ${JSON.stringify(w.calendar||[])}\n최근 Drive: ${JSON.stringify(w.drive||[])}`;}catch(e){}const j=await api("/api/ai",{method:"POST",body:JSON.stringify({message:q+context})});const answer=j.text||"답변이 없습니다."; $("answer").textContent=answer;speak(answer)}catch(e){$("answer").textContent="연결 설정이 필요합니다: "+e.message}}
 function setPrompt(t){$("prompt").value=t}
 function quick(t){$("prompt").value=t;go("ai");ask()}
 function go(id){$(id).scrollIntoView({behavior:"smooth",block:"start"})}
