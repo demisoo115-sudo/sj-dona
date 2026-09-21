@@ -163,7 +163,7 @@ function donaListenAgain(){
     try{
       const j=await api("/api/ai",{
         method:"POST",
-        body:JSON.stringify({prompt:text})
+        body:JSON.stringify({message:text})
       });
 
       const answer=j.answer||j.text||j.output||"답변을 확인하지 못했습니다.";
