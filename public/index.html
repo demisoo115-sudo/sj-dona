@@ -40,6 +40,11 @@ input,textarea,select{width:100%;border:1px solid var(--line);border-radius:12px
 <textarea id="prompt" placeholder="또는 직접 입력하세요." style="margin-top:10px"></textarea>
 <div class="row" style="margin-top:8px"><button class="btn dark" onclick="ask()">DONA 실행</button><button class="btn light" onclick="setPrompt('이번 주 중요 업무와 마감 일정을 정리해줘')">이번 주 정리</button></div>
 <div id="answer" class="answer">무엇을 도와드릴까요?</div>
+<div class="row" style="margin-top:8px">
+  <button class="btn dark" id="conversationStart" onclick="startConversation()">🎙 DONA 대화 시작</button>
+  <button class="btn light" id="conversationStop" onclick="stopConversation()">■ 대화 종료</button>
+</div>
+<div id="conversationStatus" class="small">대화 모드 대기 중</div>  
 </div></section>
 
 <section class="section" id="tasksSec"><div class="head"><h2>할 일</h2></div><div class="card">
@@ -118,5 +123,93 @@ async function disconnectGoogle(){await api("/api/google/disconnect",{method:"PO
 async function enableNotify(){if(!("Notification"in window))return alert("이 브라우저는 알림을 지원하지 않습니다.");const p=await Notification.requestPermission();alert(p==="granted"?"알림을 허용했습니다.":"알림이 허용되지 않았습니다.")}
 setInterval(()=>{const bt=state.settings.briefTime||"08:00",d=new Date(),hh=String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0");if(hh===bt&&Notification.permission==="granted"){const k="brief-"+d.toISOString().slice(0,10);if(localStorage.getItem(k)!=="1"){new Notification("SJ DONA",{body:"오늘 브리핑을 확인할 시간입니다."});localStorage.setItem(k,"1")}}},60000);
 if("serviceWorker"in navigator)navigator.serviceWorker.register("/service-worker.js").catch(()=>{});
+let conversationMode=false;
+let conversationRecognition=null;
+
+function startConversation(){
+  conversationMode=true;
+  document.getElementById("conversationStatus").textContent="대화 모드 ON · 말씀하세요";
+  donaListenAgain();
+}
+
+function stopConversation(){
+  conversationMode=false;
+  if(conversationRecognition){
+    try{conversationRecognition.stop();}catch(e){}
+  }
+  speechSynthesis.cancel();
+  document.getElementById("conversationStatus").textContent="대화 모드 종료";
+}
+
+function donaListenAgain(){
+  if(!conversationMode)return;
+
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){
+    document.getElementById("conversationStatus").textContent="이 브라우저에서는 음성인식을 사용할 수 없습니다.";
+    return;
+  }
+
+  conversationRecognition=new SR();
+  conversationRecognition.lang="ko-KR";
+  conversationRecognition.interimResults=false;
+  conversationRecognition.continuous=false;
+
+  conversationRecognition.onresult=async function(e){
+    const text=e.results[0][0].transcript;
+    document.getElementById("prompt").value=text;
+    document.getElementById("conversationStatus").textContent="DONA가 생각하고 있습니다...";
+
+    try{
+      const j=await api("/api/ai",{
+        method:"POST",
+        body:JSON.stringify({prompt:text})
+      });
+
+      const answer=j.answer||j.text||j.output||"답변을 확인하지 못했습니다.";
+      document.getElementById("answer").textContent=answer;
+
+      if(!conversationMode)return;
+
+      speechSynthesis.cancel();
+      const u=new SpeechSynthesisUtterance(answer);
+      u.lang="ko-KR";
+      u.rate=1;
+      u.pitch=1.05;
+
+      const voices=speechSynthesis.getVoices();
+      const ko=voices.filter(v=>
+        (v.lang||"").toLowerCase().startsWith("ko")
+      );
+
+      const female=ko.find(v=>
+        /SunHi|Yuna|Heami|Seoyeon|Sora|Jiyun|female|여성/i.test(v.name)
+      );
+
+      u.voice=female||ko[0]||null;
+
+      u.onend=function(){
+        if(conversationMode){
+          document.getElementById("conversationStatus").textContent="말씀하세요";
+          setTimeout(donaListenAgain,500);
+        }
+      };
+
+      speechSynthesis.speak(u);
+
+    }catch(err){
+      document.getElementById("conversationStatus").textContent="오류: "+err.message;
+      if(conversationMode)setTimeout(donaListenAgain,1500);
+    }
+  };
+
+  conversationRecognition.onerror=function(e){
+    if(conversationMode && e.error!=="not-allowed"){
+      setTimeout(donaListenAgain,1000);
+    }
+  };
+
+  conversationRecognition.start();
+}
 load();
 </script></body></html>
