@@ -79,7 +79,80 @@ input,textarea,select{width:100%;border:1px solid var(--line);border-radius:12px
 <p class="small">브리핑 시간은 앱이 실행 중일 때 브라우저 알림에 사용됩니다. 완전한 백그라운드 푸시는 별도 푸시 서버 구성이 필요합니다.</p>
 </div></section>
 </div>
+<section class="section" id="filesSec">
+  <div class="head">
+    <h2>📁 DONA 파일 보관함</h2>
+    <span class="badge good">DOCUMENTS</span>
+  </div>
 
+  <div class="card">
+    <h3>사진 · 문서 업로드</h3>
+    <p class="small">
+      주문서, 발주서, 영수증, 수출·물류 서류, PDF, Excel, Word, 사진을 보관하세요.
+    </p>
+
+    <select id="fileCategory">
+      <option value="주문서">주문서</option>
+      <option value="발주서">발주서</option>
+      <option value="견적서">견적서</option>
+      <option value="영수증">영수증</option>
+      <option value="수출물류">수출·물류</option>
+      <option value="정부지원">정부지원</option>
+      <option value="SJ GLOBAL">SJ GLOBAL</option>
+      <option value="DECAFREE">DE’CAFREE</option>
+      <option value="직원">직원</option>
+      <option value="개인">개인</option>
+      <option value="기타">기타</option>
+    </select>
+
+    <input
+      id="fileInput"
+      type="file"
+      accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt"
+      multiple
+      style="margin-top:10px"
+    >
+
+    <input
+      id="fileMemo"
+      placeholder="파일 메모 예: 2026년 9월 한국 카페용품 주문서"
+      style="margin-top:10px"
+    >
+
+    <div class="row" style="margin-top:10px">
+      <button class="btn dark" onclick="uploadFiles()">파일 저장</button>
+
+      <button class="btn light"
+        onclick="document.getElementById('cameraInput').click()">
+        📷 사진 촬영
+      </button>
+    </div>
+
+    <input
+      id="cameraInput"
+      type="file"
+      accept="image/*"
+      capture="environment"
+      style="display:none"
+      onchange="uploadCameraFile()"
+    >
+
+    <div id="uploadStatus" class="small" style="margin-top:12px">
+      저장할 사진이나 문서를 선택하세요.
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="head">
+      <h3>저장된 파일</h3>
+      <button class="btn light" onclick="loadFiles()">새로고침</button>
+    </div>
+
+    <div id="fileList">
+      저장된 파일을 불러오는 중...
+    </div>
+  </div>
+</section>
 <div class="bottom"><div>
 <button class="nav" onclick="go('home')"><b>⌂</b>홈</button><button class="nav" onclick="go('ai')"><b>✦</b>DONA</button><button class="nav" onclick="go('tasksSec')"><b>✓</b>할 일</button><button class="nav" onclick="go('calSec')"><b>◫</b>일정</button><button class="nav" onclick="go('workSec')"><b>▦</b>업무</button>
 </div></div>
@@ -210,6 +283,95 @@ function donaListenAgain(){
   };
 
   conversationRecognition.start();
+}
+async function uploadFiles(){
+  const input=document.getElementById("fileInput");
+  const category=document.getElementById("fileCategory")?.value || "기타";
+  const status=document.getElementById("fileUploadStatus");
+
+  if(!input || !input.files || input.files.length===0){
+    alert("업로드할 사진 또는 파일을 선택해 주세요.");
+    return;
+  }
+
+  if(status) status.textContent="파일을 업로드하고 있습니다...";
+
+  try{
+    for(const file of input.files){
+      const form=new FormData();
+      form.append("file",file);
+      form.append("category",category);
+
+      const r=await fetch("/api/files",{
+        method:"POST",
+        body:form
+      });
+
+      const j=await r.json();
+      if(!r.ok) throw new Error(j.error || "업로드 실패");
+    }
+
+    input.value="";
+    if(status) status.textContent="저장 완료";
+    await loadFiles();
+    alert("DONA 파일 보관함에 저장했습니다.");
+  }catch(e){
+    if(status) status.textContent="업로드 실패: "+e.message;
+    alert("파일 업로드 실패: "+e.message);
+  }
+}
+
+async function loadFiles(){
+  const box=document.getElementById("fileList");
+  if(!box) return;
+
+  try{
+    const r=await fetch("/api/files");
+    const j=await r.json();
+
+    if(!r.ok) throw new Error(j.error || "파일 목록 불러오기 실패");
+
+    const files=j.files || j || [];
+
+    if(!files.length){
+      box.innerHTML="<p>저장된 파일이 없습니다.</p>";
+      return;
+    }
+
+    box.innerHTML=files.map(f=>`
+      <div class="item">
+        <b>${esc(f.originalName || f.name || "파일")}</b><br>
+        <span class="small">${esc(f.category || "기타")}</span>
+        <div style="margin-top:8px">
+          <button onclick="window.open('/api/files/${encodeURIComponent(f.id)}','_blank')">열기</button>
+          <button onclick="deleteFile('${f.id}')">삭제</button>
+        </div>
+      </div>
+    `).join("");
+  }catch(e){
+    box.textContent="파일 목록 오류: "+e.message;
+  }
+}
+
+async function deleteFile(id){
+  if(!confirm("이 파일을 삭제할까요?")) return;
+
+  try{
+    const r=await fetch("/api/files/"+encodeURIComponent(id),{
+      method:"DELETE"
+    });
+
+    const j=await r.json().catch(()=>({}));
+
+    if(!r.ok){
+      throw new Error(j.error || "삭제 실패");
+    }
+
+    await loadFiles();
+    alert("파일을 삭제했습니다.");
+  }catch(e){
+    alert("파일 삭제 실패: "+e.message);
+  }
 }
 load();
 </script></body></html>
