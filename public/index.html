@@ -343,7 +343,7 @@ async function loadFiles(){
         <b>${esc(f.originalName || f.name || "파일")}</b><br>
         <span class="small">${esc(f.category || "기타")}</span>
         <div style="margin-top:8px">
-          <button onclick="window.open('/api/files/${encodeURIComponent(f.id)}','_blank')">열기</button>
+          <button onclick="window.location.href='/api/files/${encodeURIComponent(f.id)}'">열기</button>
           <button onclick="deleteFile('${f.id}')">삭제</button>
         </div>
       </div>
