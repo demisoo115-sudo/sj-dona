@@ -43,7 +43,16 @@ app.get("/api/brief",async(req,res)=>{try{const db=loadDB(),ws=await getWorkspac
 const storage=multer.diskStorage({destination:(req,file,cb)=>cb(null,UPLOADS),filename:(req,file,cb)=>cb(null,`${Date.now()}-${crypto.randomBytes(5).toString("hex")}${path.extname(file.originalname)}`)});
 const upload=multer({storage,limits:{fileSize:25*1024*1024}});
 function fileList(){return fs.readdirSync(UPLOADS).filter(n=>!n.endsWith(".meta.json")).map(n=>{const p=path.join(UPLOADS,n),s=fs.statSync(p);const m=metaFor(n);return{id:n,name:m.name||n,type:m.type||"",size:s.size,modified:s.mtime.toISOString()}}).sort((a,b)=>b.modified.localeCompare(a.modified))}
-app.get("/api/files",(req,res)=>res.json({files:fileList()}));
+app.get("/api/files",(req,res)=>{
+  try{
+    fs.mkdirSync(UPLOADS,{recursive:true});
+    const files=fileList();
+    res.json({files});
+  }catch(e){
+    console.error("FILE LIST ERROR:",e);
+    res.status(500).json({files:[],error:e.message});
+  }
+});
 app.post("/api/files",upload.single("file"),(req,res)=>{if(!req.file)return res.status(400).json({error:"파일이 없습니다."});const meta={id:req.file.filename,name:req.file.originalname,type:req.file.mimetype,size:req.file.size,modified:new Date().toISOString()};fs.writeFileSync(path.join(UPLOADS,req.file.filename+".meta.json"),JSON.stringify(meta));res.json(meta)});
 function metaFor(id){try{return JSON.parse(fs.readFileSync(path.join(UPLOADS,id+".meta.json"),"utf8"))}catch{return{id,name:id,type:"application/octet-stream"}}}
 app.get("/api/files/:id",(req,res)=>{const p=path.join(UPLOADS,path.basename(req.params.id));if(!fs.existsSync(p))return res.status(404).send("Not found");res.download(p,metaFor(req.params.id).name)});
