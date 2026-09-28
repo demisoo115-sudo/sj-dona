@@ -39,7 +39,14 @@ function localContext(db,workspace){const open=(db.tasks||[]).filter(x=>!x.done)
 async function openaiText(message,context){const r=await fetch("https://api.openai.com/v1/responses",{method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${process.env.OPENAI_API_KEY}`},body:JSON.stringify({model:process.env.OPENAI_MODEL||"gpt-5.6",instructions:"You are SJ DONA, my private executive AI manager and personal secretary. Reply in Korean unless I ask otherwise. Act as a proactive executive assistant, not just a chatbot. Use the provided Context, including Google Calendar, Gmail, Google Drive, registered tasks, schedules, notes, and business information, before answering. When I ask what I should do today or what is important, check available information and prioritize: 1) urgent deadlines and today's schedule, 2) important Gmail requiring action, 3) unfinished high-priority tasks, 4) SJ GLOBAL and DE'CAFREE business operations, 5) export and logistics, 6) Korean government support and voucher work, 7) staff and finance matters, and 8) personal schedule. Clearly tell me what I should do first and what should follow. Never claim that you checked information that is not present in the Context. If information is missing, say exactly what is missing. Be concise, practical, accurate, and action-oriented. Do not invent facts.",input:`Context:\n${JSON.stringify(context)}\n\nUser request:\n${message}`})});const j=await r.json();if(!r.ok)throw new Error(j.error?.message||"OpenAI request failed");return (j.output||[]).flatMap(o=>o.content||[]).filter(c=>c.type==="output_text").map(c=>c.text).join("\n")||j.output_text||""}
 app.post("/api/ai",async(req,res)=>{try{if(!process.env.OPENAI_API_KEY)return res.status(400).json({error:"OPENAI_API_KEY is not configured"});const input=String(req.body?.message||"").trim();if(!input)return res.status(400).json({error:"message is required"});res.json({text:await openaiText(input,localContext(loadDB(),await getWorkspace()))})}catch(e){res.status(500).json({error:e.message})}});
 app.get("/api/brief",async(req,res)=>{try{const db=loadDB(),ws=await getWorkspace(),open=(db.tasks||[]).filter(x=>!x.done);if(!process.env.OPENAI_API_KEY)return res.json({text:`오늘 미완료 업무 ${open.length}개입니다.`});res.json({text:await openaiText("오늘 브리핑: 가장 중요한 일 3개, 가까운 일정, 확인할 이메일, 필요한 문서와 후속조치 순서로 정리해줘.",localContext(db,ws))})}catch(e){res.status(500).json({error:e.message})}});
-
+function fixFilename(name){
+  try{
+    const fixed=Buffer.from(name,"latin1").toString("utf8");
+    return fixed.includes("\uFFFD") ? name : fixed;
+  }catch(e){
+    return name;
+  }
+}
 const storage=multer.diskStorage({destination:(req,file,cb)=>cb(null,UPLOADS),filename:(req,file,cb)=>cb(null,`${Date.now()}-${crypto.randomBytes(5).toString("hex")}${path.extname(file.originalname)}`)});
 const upload=multer({storage,limits:{fileSize:25*1024*1024}});
 function fileList(){return fs.readdirSync(UPLOADS).filter(n=>!n.endsWith(".meta.json")).map(n=>{const p=path.join(UPLOADS,n),s=fs.statSync(p);const m=metaFor(n);return{id:n,name:m.name||n,type:m.type||"",size:s.size,modified:s.mtime.toISOString()}}).sort((a,b)=>b.modified.localeCompare(a.modified))}
@@ -53,7 +60,7 @@ app.get("/api/files",(req,res)=>{
     res.status(500).json({files:[],error:e.message});
   }
 });
-app.post("/api/files",upload.single("file"),(req,res)=>{if(!req.file)return res.status(400).json({error:"파일이 없습니다."});const meta={id:req.file.filename,name:req.file.originalname,type:req.file.mimetype,size:req.file.size,modified:new Date().toISOString()};fs.writeFileSync(path.join(UPLOADS,req.file.filename+".meta.json"),JSON.stringify(meta));res.json(meta)});
+app.post("/api/files",upload.single("file"),(req,res)=>{if(!req.file)return res.status(400).json({error:"파일이 없습니다."});const meta={id:req.file.filename,name:fixFilename(req.file.originalname),,type:req.file.mimetype,size:req.file.size,modified:new Date().toISOString()};fs.writeFileSync(path.join(UPLOADS,req.file.filename+".meta.json"),JSON.stringify(meta));res.json(meta)});
 function metaFor(id){try{return JSON.parse(fs.readFileSync(path.join(UPLOADS,id+".meta.json"),"utf8"))}catch{return{id,name:id,type:"application/octet-stream"}}}
 app.get("/api/files/:id",(req,res)=>{const p=path.join(UPLOADS,path.basename(req.params.id));if(!fs.existsSync(p))return res.status(404).send("Not found");res.download(p,metaFor(req.params.id).name)});
 app.delete("/api/files/:id",(req,res)=>{const id=path.basename(req.params.id);for(const p of[path.join(UPLOADS,id),path.join(UPLOADS,id+".meta.json")])try{if(fs.existsSync(p))fs.unlinkSync(p)}catch{}res.json({ok:true})});
