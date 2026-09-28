@@ -60,7 +60,7 @@ app.get("/api/files",(req,res)=>{
     res.status(500).json({files:[],error:e.message});
   }
 });
-app.post("/api/files",upload.single("file"),(req,res)=>{if(!req.file)return res.status(400).json({error:"파일이 없습니다."});const meta={id:req.file.filename,name:fixFilename(req.file.originalname),,type:req.file.mimetype,size:req.file.size,modified:new Date().toISOString()};fs.writeFileSync(path.join(UPLOADS,req.file.filename+".meta.json"),JSON.stringify(meta));res.json(meta)});
+app.post("/api/files",upload.single("file"),(req,res)=>{if(!req.file)return res.status(400).json({error:"파일이 없습니다."});const meta={id:req.file.filename,name:fixFilename(req.file.originalname),type:req.file.mimetype,size:req.file.size,modified:new Date().toISOString()};fs.writeFileSync(path.join(UPLOADS,req.file.filename+".meta.json"),JSON.stringify(meta,null,2),"utf8");res.json(meta);});
 function metaFor(id){try{return JSON.parse(fs.readFileSync(path.join(UPLOADS,id+".meta.json"),"utf8"))}catch{return{id,name:id,type:"application/octet-stream"}}}
 app.get("/api/files/:id",(req,res)=>{const p=path.join(UPLOADS,path.basename(req.params.id));if(!fs.existsSync(p))return res.status(404).send("Not found");res.download(p,metaFor(req.params.id).name)});
 app.delete("/api/files/:id",(req,res)=>{const id=path.basename(req.params.id);for(const p of[path.join(UPLOADS,id),path.join(UPLOADS,id+".meta.json")])try{if(fs.existsSync(p))fs.unlinkSync(p)}catch{}res.json({ok:true})});
