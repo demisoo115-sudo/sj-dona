@@ -326,30 +326,43 @@ async function loadFiles(){
   const box=document.getElementById("fileList");
   if(!box) return;
 
+  box.textContent="저장된 파일을 불러오는 중...";
+
   try{
-    const r=await fetch("/api/files");
+    const r=await fetch("/api/files",{
+      method:"GET",
+      cache:"no-store"
+    });
+
     const j=await r.json();
 
-    if(!r.ok) throw new Error(j.error || "파일 목록 불러오기 실패");
+    if(!r.ok){
+      throw new Error(j.error || "파일 목록을 불러오지 못했습니다.");
+    }
 
-    const files=j.files || j || [];
+    const files=Array.isArray(j.files)
+      ? j.files
+      : (Array.isArray(j) ? j : []);
 
-    if(!files.length){
+    if(files.length===0){
       box.innerHTML="<p>저장된 파일이 없습니다.</p>";
       return;
     }
 
     box.innerHTML=files.map(f=>`
       <div class="item">
-        <b>${esc(f.originalName || f.name || "파일")}</b><br>
+        <b>${esc(f.name || f.originalName || "파일")}</b>
         <span class="small">${esc(f.category || "기타")}</span>
+
         <div style="margin-top:8px">
           <button onclick="window.location.href='/api/files/${encodeURIComponent(f.id)}'">열기</button>
           <button onclick="deleteFile('${f.id}')">삭제</button>
         </div>
       </div>
     `).join("");
+
   }catch(e){
+    console.error("FILE LIST ERROR:",e);
     box.textContent="파일 목록 오류: "+e.message;
   }
 }
