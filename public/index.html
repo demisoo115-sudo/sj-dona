@@ -356,6 +356,7 @@ async function loadFiles(){
 
         <div style="margin-top:8px">
           <button onclick="window.location.href='/api/files/${encodeURIComponent(f.id)}'">열기</button>
+          <button onclick="analyzeFile('${f.id}')">✨ DONA 분석</button>
           <button onclick="deleteFile('${f.id}')">삭제</button>
         </div>
       </div>
@@ -366,7 +367,40 @@ async function loadFiles(){
     box.textContent="파일 목록 오류: "+e.message;
   }
 }
+async function analyzeFile(id){
+  const instruction=prompt(
+    "DONA에게 이 파일을 어떻게 분석할지 입력하세요.",
+    "이 파일을 분석하고 핵심 내용, 중요한 숫자와 날짜, 필요한 후속조치를 한국어로 정리해줘."
+  );
 
+  if(instruction===null) return;
+
+  try{
+    const r=await fetch("/api/files/"+encodeURIComponent(id)+"/analyze",{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({instruction})
+    });
+
+    const j=await r.json();
+
+    if(!r.ok){
+      throw new Error(j.error || "파일 분석 실패");
+    }
+
+    const answer=j.text || "분석 결과가 없습니다.";
+
+    const aiBox=document.getElementById("answer");
+    if(aiBox){
+      aiBox.textContent=answer;
+    }
+
+    alert("DONA가 파일 분석을 완료했습니다.\n\n"+answer);
+
+  }catch(e){
+    alert("DONA 파일 분석 실패: "+e.message);
+  }
+}
 async function deleteFile(id){
   if(!confirm("이 파일을 삭제할까요?")) return;
 
