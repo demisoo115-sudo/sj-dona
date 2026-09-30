@@ -64,6 +64,118 @@ app.post("/api/files",upload.single("file"),(req,res)=>{if(!req.file)return res.
 function metaFor(id){try{return JSON.parse(fs.readFileSync(path.join(UPLOADS,id+".meta.json"),"utf8"))}catch{return{id,name:id,type:"application/octet-stream"}}}
 app.get("/api/files/:id",(req,res)=>{const id=path.basename(req.params.id);const p=path.join(UPLOADS,id);if(!fs.existsSync(p))return res.status(404).send("Not found");const m=metaFor(id);res.setHeader("Content-Type",m.type||"application/octet-stream");res.setHeader("Content-Disposition","inline; filename*=UTF-8''"+encodeURIComponent(m.name||id));res.sendFile(p);});
 app.delete("/api/files/:id",(req,res)=>{const id=path.basename(req.params.id);for(const p of[path.join(UPLOADS,id),path.join(UPLOADS,id+".meta.json")])try{if(fs.existsSync(p))fs.unlinkSync(p)}catch{}res.json({ok:true})});
-app.post("/api/files/:id/analyze",async(req,res)=>{try{if(!process.env.OPENAI_API_KEY)return res.status(400).json({error:"OPENAI_API_KEY is not configured"});const id=path.basename(req.params.id),p=path.join(UPLOADS,id);if(!fs.existsSync(p))return res.status(404).json({error:"파일을 찾을 수 없습니다."});const meta=metaFor(id),form=new FormData();form.append("purpose","user_data");form.append("file",new Blob([fs.readFileSync(p)],{type:meta.type}),meta.name);const fr=await fetch("https://api.openai.com/v1/files",{method:"POST",headers:{Authorization:`Bearer ${process.env.OPENAI_API_KEY}`},body:form}),fj=await fr.json();if(!fr.ok)throw new Error(fj.error?.message||"OpenAI file upload failed");const instruction=String(req.body?.instruction||"이 파일을 분석하고 핵심 내용, 중요한 숫자/날짜, 필요한 후속조치를 한국어로 정리해줘.");const rr=await fetch("https://api.openai.com/v1/responses",{method:"POST",headers:{"Content-Type":"application/json",Authorization:`Bearer ${process.env.OPENAI_API_KEY}`},body:JSON.stringify({model:process.env.OPENAI_MODEL||"gpt-5.6",instructions:"You are SJ DONA. Analyze the attached user file carefully. Do not invent unreadable details. Reply in Korean unless requested otherwise.",input:[{role:"user",content:[{type:"input_file",file_id:fj.id},{type:"input_text",text:instruction}]}]})}),j=await rr.json();if(!rr.ok)throw new Error(j.error?.message||"File analysis failed");const text=(j.output||[]).flatMap(o=>o.content||[]).filter(c=>c.type==="output_text").map(c=>c.text).join("\n")||j.output_text||"";res.json({text})}catch(e){res.status(500).json({error:e.message})}});
+app.post("/api/files/:id/analyze",async(req,res)=>{
+  try{
+    if(!process.env.OPENAI_API_KEY){
+      return res.status(400).json({error:"OPENAI_API_KEY is not configured"});
+    }
 
+    const id=path.basename(req.params.id);
+    const p=path.join(UPLOADS,id);
+
+    if(!fs.existsSync(p)){
+      return res.status(404).json({error:"파일을 찾을 수 없습니다."});
+    }
+
+    const meta=metaFor(id);
+    const form=new FormData();
+
+    form.append("purpose","user_data");
+    form.append(
+      "file",
+      new Blob([fs.readFileSync(p)],{type:meta.type}),
+      meta.name
+    );
+
+    const fr=await fetch("https://api.openai.com/v1/files",{
+      method:"POST",
+      headers:{
+        Authorization:`Bearer ${process.env.OPENAI_API_KEY}`
+      },
+      body:form
+    });
+
+    const fj=await fr.json();
+
+    if(!fr.ok){
+      throw new Error(
+        fj.error?.message || "OpenAI file upload failed"
+      );
+    }
+
+    const instruction=String(
+      req.body?.instruction ||
+      "이 파일을 분석하고 핵심 내용, 중요한 숫자/날짜, 필요한 후속조치를 한국어로 정리해줘."
+    );
+
+    const rr=await fetch("https://api.openai.com/v1/responses",{
+      method:"POST",
+      headers:{
+        "Content-Type":"application/json",
+        Authorization:`Bearer ${process.env.OPENAI_API_KEY}`
+      },
+      body:JSON.stringify({
+        model:process.env.OPENAI_MODEL||"gpt-5.6",
+        instructions:
+          "You are SJ DONA. Analyze the attached user file carefully. Do not invent unreadable details. Reply in Korean unless requested otherwise.",
+        input:[{
+          role:"user",
+          content:[
+            {
+              type:"input_file",
+              file_id:fj.id
+            },
+            {
+              type:"input_text",
+              text:instruction
+            }
+          ]
+        }]
+      })
+    });
+
+    const j=await rr.json();
+
+    if(!rr.ok){
+      throw new Error(
+        j.error?.message || "File analysis failed"
+      );
+    }
+
+    const text=
+      (j.output||[])
+        .flatMap(o=>o.content||[])
+        .filter(c=>c.type==="output_text")
+        .map(c=>c.text)
+        .join("\n")
+      || j.output_text
+      || "";
+
+    // DONA 장기 파일 기억에 저장
+    const db=loadDB();
+
+    if(!db.fileMemories){
+      db.fileMemories={};
+    }
+
+    db.fileMemories[id]={
+      fileId:id,
+      fileName:meta.name,
+      fileType:meta.type,
+      analyzedAt:new Date().toISOString(),
+      analysis:text
+    };
+
+    saveDB(db);
+
+    res.json({
+      text,
+      memorySaved:true
+    });
+
+  }catch(e){
+    console.error("FILE ANALYSIS ERROR:",e);
+    res.status(500).json({error:e.message});
+  }
+});
 app.listen(PORT,"0.0.0.0",()=>console.log(`SJ DONA running at ${BASE}`));
