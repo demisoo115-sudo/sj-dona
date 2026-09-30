@@ -107,7 +107,17 @@ app.post("/api/files/:id/analyze",async(req,res)=>{
       req.body?.instruction ||
       "이 파일을 분석하고 핵심 내용, 중요한 숫자/날짜, 필요한 후속조치를 한국어로 정리해줘."
     );
+const isImage = /^image\/(jpeg|jpg|png|webp|gif)$/i.test(meta.type || "");
 
+const fileContent = isImage
+  ? {
+      type: "input_image",
+      file_id: fj.id
+    }
+  : {
+      type: "input_file",
+      file_id: fj.id
+    };
     const rr=await fetch("https://api.openai.com/v1/responses",{
       method:"POST",
       headers:{
@@ -121,15 +131,12 @@ app.post("/api/files/:id/analyze",async(req,res)=>{
         input:[{
           role:"user",
           content:[
-            {
-              type:"input_file",
-              file_id:fj.id
-            },
-            {
-              type:"input_text",
-              text:instruction
-            }
-          ]
+  fileContent,
+  {
+    type:"input_text",
+    text:instruction
+  }
+]
         }]
       })
     });
