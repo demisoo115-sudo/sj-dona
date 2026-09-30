@@ -14,7 +14,76 @@ const DATA=path.join(__dirname,"data"), DB=path.join(DATA,"store.json"), TOKENS=
 fs.mkdirSync(UPLOADS,{recursive:true});
 app.use(express.json({limit:"4mb"}));
 app.use(express.static(path.join(__dirname,"public")));
+// SJ DONA private access protection
+const APP_PASSWORD = process.env.APP_PASSWORD || "";
 
+app.use((req,res,next)=>{
+  if(
+    req.path === "/login" ||
+    req.path === "/api/login" ||
+    req.path === "/api/logout" ||
+    req.path.startsWith("/manifest") ||
+    req.path.startsWith("/service-worker")
+  ){
+    return next();
+  }
+
+  const cookie = req.headers.cookie || "";
+  if(APP_PASSWORD && cookie.includes("sj_dona_auth=1")){
+    return next();
+  }
+
+  if(req.path.startsWith("/api/") || req.path.startsWith("/auth/google")){
+    return res.status(401).json({error:"SJ DONA 로그인이 필요합니다."});
+  }
+
+  return res.redirect("/login");
+});
+
+app.get("/login",(req,res)=>{
+  res.send(`<!doctype html>
+  <html lang="ko">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>SJ DONA Login</title>
+  </head>
+  <body style="font-family:sans-serif;padding:40px;max-width:420px;margin:auto">
+    <h1>SJ DONA</h1>
+    <p>개인 AI 매니저 로그인</p>
+    <form method="post" action="/api/login">
+      <input name="password" type="password"
+        placeholder="비밀번호"
+        style="width:100%;padding:15px;font-size:18px;box-sizing:border-box">
+      <button type="submit"
+        style="margin-top:15px;width:100%;padding:15px;font-size:18px">
+        로그인
+      </button>
+    </form>
+  </body>
+  </html>`);
+});
+
+app.use(express.urlencoded({extended:false}));
+
+app.post("/api/login",(req,res)=>{
+  if(APP_PASSWORD && req.body.password === APP_PASSWORD){
+    res.setHeader(
+      "Set-Cookie",
+      "sj_dona_auth=1; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=2592000"
+    );
+    return res.redirect("/");
+  }
+  res.status(401).send("비밀번호가 맞지 않습니다.");
+});
+
+app.post("/api/logout",(req,res)=>{
+  res.setHeader(
+    "Set-Cookie",
+    "sj_dona_auth=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0"
+  );
+  res.redirect("/login");
+});
 function loadDB(){try{return JSON.parse(fs.readFileSync(DB,"utf8"))}catch{return{tasks:[],events:[],notes:[],profile:{},settings:{briefTime:"08:00"}}}}
 function saveDB(db){fs.mkdirSync(DATA,{recursive:true});fs.writeFileSync(DB,JSON.stringify(db,null,2))}
 function key(){const raw=(process.env.TOKEN_ENCRYPTION_KEY||"").trim();return raw?crypto.createHash("sha256").update(raw).digest():null}
