@@ -393,7 +393,8 @@ async function analyzeFile(id){
     if(aiBox){
       aiBox.textContent=answer;
     }
-alert("DONA가 파일 분석을 완료했습니다.\n\n"+answer);
+window.donaFileContext = answer;
+    alert("DONA가 파일 분석을 완료했습니다.\n\n"+answer);
 
   }catch(e){
     alert("DONA 파일 분석 실패: "+e.message);
