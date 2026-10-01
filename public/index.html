@@ -394,7 +394,23 @@ async function analyzeFile(id){
       aiBox.textContent=answer;
     }
 window.donaFileContext = answer;
-    alert("DONA가 파일 분석을 완료했습니다.\n\n"+answer);
+window.donaFileId = id;
+
+// DONA 대화창에 분석 결과 표시
+if(aiBox){
+  aiBox.textContent =
+    "📄 DONA 문서 분석 완료\n\n" +
+    answer +
+    "\n\n이 문서에 대해 계속 질문하실 수 있습니다.";
+}
+
+// DONA 입력창으로 이동
+const donaInput = document.querySelector("textarea");
+if(donaInput){
+  donaInput.placeholder =
+    "이 문서에 대해 질문하세요. 예: 중요한 날짜 알려줘 / 수정할 부분 찾아줘";
+  donaInput.scrollIntoView({behavior:"smooth", block:"center"});
+}
 
   }catch(e){
     alert("DONA 파일 분석 실패: "+e.message);
