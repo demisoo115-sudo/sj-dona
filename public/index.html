@@ -240,7 +240,7 @@ function donaListenAgain(){
   message: window.donaFileContext
     ? `[현재 DONA가 분석한 문서 내용]\n${window.donaFileContext}\n\n[사용자 질문]\n${text}`
     : text
-})
+});
 
       const answer=j.answer||j.text||j.output||"답변을 확인하지 못했습니다.";
       document.getElementById("answer").textContent=answer;
