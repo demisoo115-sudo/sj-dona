@@ -102,7 +102,234 @@ app.get("/auth/google",(req,res)=>{if(!process.env.GOOGLE_CLIENT_ID||!process.en
 app.get("/auth/google/callback",async(req,res)=>{try{const o=oauth(),{tokens}=await o.getToken(req.query.code);setTokens(tokens);res.redirect("/?google=connected")}catch(e){res.status(500).send("Google connection failed: "+e.message)}});
 app.post("/api/google/disconnect",(req,res)=>{try{if(fs.existsSync(TOKENS))fs.unlinkSync(TOKENS)}catch{}res.json({ok:true})});
 
-async function getWorkspace(){const auth=await authedGoogle();if(!auth)return{connected:false,gmail:[],calendar:[],drive:[]};const gmail=google.gmail({version:"v1",auth}),calendar=google.calendar({version:"v3",auth}),drive=google.drive({version:"v3",auth});let mail=[],events=[],files=[];try{const l=await gmail.users.messages.list({userId:"me",maxResults:8,q:"newer_than:7d"});for(const m of(l.data.messages||[]).slice(0,8)){const r=await gmail.users.messages.get({userId:"me",id:m.id,format:"metadata",metadataHeaders:["Subject","From","Date"]}),h=Object.fromEntries((r.data.payload?.headers||[]).map(x=>[x.name,x.value]));mail.push({id:m.id,subject:h.Subject||"(제목 없음)",from:h.From||"",date:h.Date||"",snippet:r.data.snippet||""})}}catch(e){mail=[{error:e.message}]};try{const now=new Date(),end=new Date(now.getTime()+7*86400000),r=await calendar.events.list({calendarId:"primary",timeMin:now.toISOString(),timeMax:end.toISOString(),singleEvents:true,orderBy:"startTime",maxResults:15});events=(r.data.items||[]).map(x=>({summary:x.summary||"(제목 없음)",start:x.start?.dateTime||x.start?.date||"",end:x.end?.dateTime||x.end?.date||""}))}catch(e){events=[{error:e.message}]};try{const r=await drive.files.list({pageSize:12,orderBy:"modifiedTime desc",fields:"files(id,name,mimeType,modifiedTime,webViewLink)"});files=r.data.files||[]}catch(e){files=[{error:e.message}]};return{connected:true,gmail:mail,calendar:events,drive:files}}
+function decodeGmailBody(data=""){
+  try{
+    return Buffer.from(
+      data.replace(/-/g,"+").replace(/_/g,"/"),
+      "base64"
+    ).toString("utf8");
+  }catch{
+    return "";
+  }
+}
+
+function gmailBody(payload){
+  if(!payload) return "";
+
+  if(payload.body?.data){
+    return decodeGmailBody(payload.body.data);
+  }
+
+  const parts=payload.parts||[];
+
+  // 먼저 일반 텍스트 본문을 찾음
+  for(const p of parts){
+    if(p.mimeType==="text/plain" && p.body?.data){
+      return decodeGmailBody(p.body.data);
+    }
+  }
+
+  // multipart 안쪽도 검색
+  for(const p of parts){
+    const text=gmailBody(p);
+    if(text) return text;
+  }
+
+  return "";
+}
+
+function gmailAttachments(payload,list=[]){
+  if(!payload) return list;
+
+  for(const p of payload.parts||[]){
+    if(p.filename){
+      list.push({
+        name:p.filename,
+        mimeType:p.mimeType||"",
+        attachmentId:p.body?.attachmentId||""
+      });
+    }
+
+    gmailAttachments(p,list);
+  }
+
+  return list;
+}
+
+async function getWorkspace(){
+  const auth=await authedGoogle();
+
+  if(!auth){
+    return{
+      connected:false,
+      gmail:[],
+      calendar:[],
+      drive:[]
+    };
+  }
+
+  const gmail=google.gmail({
+    version:"v1",
+    auth
+  });
+
+  const calendar=google.calendar({
+    version:"v3",
+    auth
+  });
+
+  const drive=google.drive({
+    version:"v3",
+    auth
+  });
+
+  let mail=[];
+  let events=[];
+  let files=[];
+
+  // =========================
+  // GMAIL
+  // =========================
+  try{
+    const l=await gmail.users.messages.list({
+      userId:"me",
+      maxResults:15,
+      q:"newer_than:14d"
+    });
+
+    for(const m of (l.data.messages||[]).slice(0,15)){
+      try{
+        const r=await gmail.users.messages.get({
+          userId:"me",
+          id:m.id,
+          format:"full"
+        });
+
+        const headers=
+          r.data.payload?.headers||[];
+
+        const h=Object.fromEntries(
+          headers.map(x=>[
+            String(x.name||"").toLowerCase(),
+            x.value
+          ])
+        );
+
+        let body=gmailBody(r.data.payload);
+
+        // AI Context가 지나치게 커지는 것 방지
+        body=body
+          .replace(/\s+/g," ")
+          .trim()
+          .slice(0,4000);
+
+        const attachments=
+          gmailAttachments(r.data.payload,[]);
+
+        mail.push({
+          id:m.id,
+          threadId:r.data.threadId||"",
+          subject:h.subject||"(제목 없음)",
+          from:h.from||"",
+          to:h.to||"",
+          date:h.date||"",
+          snippet:r.data.snippet||"",
+          body,
+          hasAttachments:attachments.length>0,
+          attachments:attachments.map(a=>({
+            name:a.name,
+            mimeType:a.mimeType
+          }))
+        });
+
+      }catch(err){
+        console.error(
+          "GMAIL MESSAGE ERROR:",
+          err.message
+        );
+      }
+    }
+
+  }catch(e){
+    console.error("GMAIL ERROR:",e);
+    mail=[{error:e.message}];
+  }
+
+  // =========================
+  // GOOGLE CALENDAR
+  // =========================
+  try{
+    const now=new Date();
+    const end=new Date(
+      now.getTime()+14*86400000
+    );
+
+    const r=await calendar.events.list({
+      calendarId:"primary",
+      timeMin:now.toISOString(),
+      timeMax:end.toISOString(),
+      singleEvents:true,
+      orderBy:"startTime",
+      maxResults:30
+    });
+
+    events=(r.data.items||[]).map(x=>({
+      id:x.id||"",
+      summary:x.summary||"(제목 없음)",
+      description:(x.description||"").slice(0,2000),
+      location:x.location||"",
+      start:
+        x.start?.dateTime||
+        x.start?.date||
+        "",
+      end:
+        x.end?.dateTime||
+        x.end?.date||
+        "",
+      status:x.status||"",
+      htmlLink:x.htmlLink||""
+    }));
+
+  }catch(e){
+    console.error("CALENDAR ERROR:",e);
+    events=[{error:e.message}];
+  }
+
+  // =========================
+  // GOOGLE DRIVE
+  // =========================
+  try{
+    const r=await drive.files.list({
+      pageSize:25,
+      orderBy:"modifiedTime desc",
+      fields:
+        "files(id,name,mimeType,modifiedTime,createdTime,size,webViewLink,description)"
+    });
+
+    files=(r.data.files||[]).map(f=>({
+      id:f.id,
+      name:f.name||"(이름 없음)",
+      mimeType:f.mimeType||"",
+      modifiedTime:f.modifiedTime||"",
+      createdTime:f.createdTime||"",
+      size:f.size||"",
+      description:
+        (f.description||"").slice(0,1000),
+      webViewLink:f.webViewLink||""
+    }));
+
+  }catch(e){
+    console.error("DRIVE ERROR:",e);
+    files=[{error:e.message}];
+  }
+
+  return{
+    connected:true,
+    gmail:mail,
+    calendar:events,
+    drive:files
+  };
+}
 app.get("/api/workspace",async(req,res)=>{try{res.json(await getWorkspace())}catch(e){res.status(500).json({error:e.message})}});
 function localContext(db,workspace){const open=(db.tasks||[]).filter(x=>!x.done),today=new Date().toISOString().slice(0,10);return{profile:db.profile||{},settings:db.settings||{},openTasks:open.slice(0,30),todayLocalEvents:(db.events||[]).filter(x=>x.date===today),notes:(db.notes||[]).slice(0,20),googleWorkspace:workspace}}
 async function openaiText(message,context){const r=await fetch("https://api.openai.com/v1/responses",{method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${process.env.OPENAI_API_KEY}`},body:JSON.stringify({model:process.env.OPENAI_MODEL||"gpt-5.6",instructions:"You are SJ DONA, my private executive AI manager and personal secretary. Reply in Korean unless I ask otherwise. Act as a proactive executive assistant, not just a chatbot. Use the provided Context, including Google Calendar, Gmail, Google Drive, registered tasks, schedules, notes, and business information, before answering. When I ask what I should do today or what is important, check available information and prioritize: 1) urgent deadlines and today's schedule, 2) important Gmail requiring action, 3) unfinished high-priority tasks, 4) SJ GLOBAL and DE'CAFREE business operations, 5) export and logistics, 6) Korean government support and voucher work, 7) staff and finance matters, and 8) personal schedule. Clearly tell me what I should do first and what should follow. Never claim that you checked information that is not present in the Context. If information is missing, say exactly what is missing. Be concise, practical, accurate, and action-oriented. Do not invent facts.",input:`Context:\n${JSON.stringify(context)}\n\nUser request:\n${message}`})});const j=await r.json();if(!r.ok)throw new Error(j.error?.message||"OpenAI request failed");return (j.output||[]).flatMap(o=>o.content||[]).filter(c=>c.type==="output_text").map(c=>c.text).join("\n")||j.output_text||""}
