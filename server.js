@@ -9,6 +9,14 @@ import { fileURLToPath } from "url";
 import pg from "pg";
 
 dotenv.config();
+const { Pool } = pg;
+
+const pool = process.env.DATABASE_URL
+  ? new Pool({
+      connectionString: process.env.DATABASE_URL,
+      ssl: { rejectUnauthorized: false }
+    })
+  : null;
 const __filename=fileURLToPath(import.meta.url), __dirname=path.dirname(__filename);
 const app=express(), PORT=Number(process.env.PORT||8787), BASE=process.env.APP_BASE_URL||`http://localhost:${PORT}`;
 const DATA=path.join(__dirname,"data"), DB=path.join(DATA,"store.json"), TOKENS=path.join(DATA,"google.tokens.enc"), UPLOADS=path.join(DATA,"uploads");
