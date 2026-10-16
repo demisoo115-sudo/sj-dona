@@ -172,8 +172,15 @@ app.get("/api/state",async(req,res)=>{
     console.error("STATE LOAD ERROR:",e);
     res.status(500).json({error:e.message});
   }
-});app.post("/api/state",(req,res)=>{saveDB(req.body||{});res.json({ok:true})});
-
+app.post("/api/state",async(req,res)=>{
+  try{
+    await saveDBToPostgres(req.body||{});
+    res.json({ok:true});
+  }catch(e){
+    console.error("STATE SAVE ERROR:",e);
+    res.status(500).json({error:e.message});
+  }
+});
 app.get("/auth/google",(req,res)=>{if(!process.env.GOOGLE_CLIENT_ID||!process.env.GOOGLE_CLIENT_SECRET)return res.status(400).send("Google OAuth environment variables are not configured.");const o=oauth();res.redirect(o.generateAuthUrl({access_type:"offline",prompt:"consent",scope:["https://www.googleapis.com/auth/gmail.readonly","https://www.googleapis.com/auth/calendar.readonly","https://www.googleapis.com/auth/drive.readonly"]}))});
 app.get("/auth/google/callback",async(req,res)=>{try{const o=oauth(),{tokens}=await o.getToken(req.query.code);setTokens(tokens);res.redirect("/?google=connected")}catch(e){res.status(500).send("Google connection failed: "+e.message)}});
 app.post("/api/google/disconnect",(req,res)=>{try{if(fs.existsSync(TOKENS))fs.unlinkSync(TOKENS)}catch{}res.json({ok:true})});
