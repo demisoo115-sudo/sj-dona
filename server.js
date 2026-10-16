@@ -485,8 +485,23 @@ function fixFilename(name){
     return fixed.includes("\uFFFD") ? name : fixed;
   }catch(e){
     return name;
-  }
+      }
 }
+
+async function initFileDatabase(){
+  if(!pool) return;
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS sj_dona_files (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      mime_type TEXT,
+      data BYTEA NOT NULL,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `);
+}
+
 const storage=multer.diskStorage({destination:(req,file,cb)=>cb(null,UPLOADS),filename:(req,file,cb)=>cb(null,`${Date.now()}-${crypto.randomBytes(5).toString("hex")}${path.extname(file.originalname)}`)});
 const upload=multer({storage,limits:{fileSize:25*1024*1024}});
 function fileList(){return fs.readdirSync(UPLOADS).filter(n=>!n.endsWith(".meta.json")).map(n=>{const p=path.join(UPLOADS,n),s=fs.statSync(p);const m=metaFor(n);return{id:n,name:m.name||n,type:m.type||"",size:s.size,modified:s.mtime.toISOString()}}).sort((a,b)=>b.modified.localeCompare(a.modified))}
