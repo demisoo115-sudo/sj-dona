@@ -165,8 +165,14 @@ function oauth(){return new google.auth.OAuth2(process.env.GOOGLE_CLIENT_ID,proc
 async function authedGoogle(){const t=getTokens();if(!t)return null;const o=oauth();o.setCredentials(t);o.on("tokens",fresh=>setTokens({...t,...fresh}));return o}
 
 app.get("/api/status",(req,res)=>res.json({ok:true,openai:Boolean(process.env.OPENAI_API_KEY),google:Boolean(getTokens()),model:process.env.OPENAI_MODEL||"gpt-5.6"}));
-app.get("/api/state",(req,res)=>res.json(loadDB()));
-app.post("/api/state",(req,res)=>{saveDB(req.body||{});res.json({ok:true})});
+app.get("/api/state",async(req,res)=>{
+  try{
+    res.json(await loadDBFromPostgres());
+  }catch(e){
+    console.error("STATE LOAD ERROR:",e);
+    res.status(500).json({error:e.message});
+  }
+});app.post("/api/state",(req,res)=>{saveDB(req.body||{});res.json({ok:true})});
 
 app.get("/auth/google",(req,res)=>{if(!process.env.GOOGLE_CLIENT_ID||!process.env.GOOGLE_CLIENT_SECRET)return res.status(400).send("Google OAuth environment variables are not configured.");const o=oauth();res.redirect(o.generateAuthUrl({access_type:"offline",prompt:"consent",scope:["https://www.googleapis.com/auth/gmail.readonly","https://www.googleapis.com/auth/calendar.readonly","https://www.googleapis.com/auth/drive.readonly"]}))});
 app.get("/auth/google/callback",async(req,res)=>{try{const o=oauth(),{tokens}=await o.getToken(req.query.code);setTokens(tokens);res.redirect("/?google=connected")}catch(e){res.status(500).send("Google connection failed: "+e.message)}});
