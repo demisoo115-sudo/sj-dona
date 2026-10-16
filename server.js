@@ -94,6 +94,17 @@ app.post("/api/logout",(req,res)=>{
   res.redirect("/login");
 });
 function loadDB(){try{return JSON.parse(fs.readFileSync(DB,"utf8"))}catch{return{tasks:[],events:[],notes:[],profile:{},settings:{briefTime:"08:00"}}}}
+async function initDatabase(){
+  if(!pool) return;
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS sj_dona_state (
+      id INTEGER PRIMARY KEY,
+      data JSONB NOT NULL,
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `);
+}
 function saveDB(db){fs.mkdirSync(DATA,{recursive:true});fs.writeFileSync(DB,JSON.stringify(db,null,2))}
 function key(){const raw=(process.env.TOKEN_ENCRYPTION_KEY||"").trim();return raw?crypto.createHash("sha256").update(raw).digest():null}
 function encrypt(obj){const k=key();if(!k)throw new Error("TOKEN_ENCRYPTION_KEY is not set");const iv=crypto.randomBytes(12),c=crypto.createCipheriv("aes-256-gcm",k,iv),enc=Buffer.concat([c.update(JSON.stringify(obj),"utf8"),c.final()]),tag=c.getAuthTag();return Buffer.concat([iv,tag,enc]).toString("base64")}
