@@ -161,6 +161,22 @@ function encrypt(obj){const k=key();if(!k)throw new Error("TOKEN_ENCRYPTION_KEY 
 function decrypt(s){const k=key();if(!k)throw new Error("TOKEN_ENCRYPTION_KEY is not set");const b=Buffer.from(s,"base64"),iv=b.subarray(0,12),tag=b.subarray(12,28),enc=b.subarray(28),d=crypto.createDecipheriv("aes-256-gcm",k,iv);d.setAuthTag(tag);return JSON.parse(Buffer.concat([d.update(enc),d.final()]).toString("utf8"))}
 function getTokens(){try{return decrypt(fs.readFileSync(TOKENS,"utf8"))}catch{return null}}
 function setTokens(t){fs.mkdirSync(DATA,{recursive:true});fs.writeFileSync(TOKENS,encrypt(t))}
+async function getGoogleTokensFromPostgres(){
+  if(!pool) return getTokens();
+
+  try{
+    const db=await loadDBFromPostgres();
+
+    if(db.googleTokens){
+      return decrypt(db.googleTokens);
+    }
+
+    return getTokens();
+  }catch(e){
+    console.error("GOOGLE TOKEN LOAD ERROR:",e);
+    return getTokens();
+  }
+}
 async function saveGoogleTokensToPostgres(tokens){
   if(!pool) return setTokens(tokens);
 
