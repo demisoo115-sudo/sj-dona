@@ -569,8 +569,8 @@ const fileContent = isImage
       || j.output_text
       || "";
 
-    // DONA 장기 파일 기억에 저장
-    const db=loadDB();
+   // DONA 장기 파일 기억에 저장
+const db=await loadDBFromPostgres();
 
     if(!db.fileMemories){
       db.fileMemories={};
@@ -584,7 +584,7 @@ const fileContent = isImage
       analysis:text
     };
 
-    saveDB(db);
+    await saveDBToPostgres(db);
 
     res.json({
       text,
