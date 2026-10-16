@@ -161,6 +161,20 @@ function encrypt(obj){const k=key();if(!k)throw new Error("TOKEN_ENCRYPTION_KEY 
 function decrypt(s){const k=key();if(!k)throw new Error("TOKEN_ENCRYPTION_KEY is not set");const b=Buffer.from(s,"base64"),iv=b.subarray(0,12),tag=b.subarray(12,28),enc=b.subarray(28),d=crypto.createDecipheriv("aes-256-gcm",k,iv);d.setAuthTag(tag);return JSON.parse(Buffer.concat([d.update(enc),d.final()]).toString("utf8"))}
 function getTokens(){try{return decrypt(fs.readFileSync(TOKENS,"utf8"))}catch{return null}}
 function setTokens(t){fs.mkdirSync(DATA,{recursive:true});fs.writeFileSync(TOKENS,encrypt(t))}
+async function saveGoogleTokensToPostgres(tokens){
+  if(!pool) return setTokens(tokens);
+
+  try{
+    await initDatabase();
+
+    const db=await loadDBFromPostgres();
+    db.googleTokens=encrypt(tokens);
+
+    await saveDBToPostgres(db);
+  }catch(e){
+    console.error("GOOGLE TOKEN SAVE ERROR:",e);
+    setTokens(tokens);
+  }
 function oauth(){return new google.auth.OAuth2(process.env.GOOGLE_CLIENT_ID,process.env.GOOGLE_CLIENT_SECRET,`${BASE}/auth/google/callback`)}
 async function authedGoogle(){const t=getTokens();if(!t)return null;const o=oauth();o.setCredentials(t);o.on("tokens",fresh=>setTokens({...t,...fresh}));return o}
 
