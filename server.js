@@ -172,6 +172,7 @@ app.get("/api/state",async(req,res)=>{
     console.error("STATE LOAD ERROR:",e);
     res.status(500).json({error:e.message});
   }
+  });
 app.post("/api/state",async(req,res)=>{
   try{
     await saveDBToPostgres(req.body||{});
