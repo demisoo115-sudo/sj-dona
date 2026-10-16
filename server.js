@@ -192,8 +192,7 @@ async function saveGoogleTokensToPostgres(tokens){
     setTokens(tokens);
   }
 function oauth(){return new google.auth.OAuth2(process.env.GOOGLE_CLIENT_ID,process.env.GOOGLE_CLIENT_SECRET,`${BASE}/auth/google/callback`)}
-async function authedGoogle(){const t=getTokens();if(!t)return null;const o=oauth();o.setCredentials(t);o.on("tokens",fresh=>setTokens({...t,...fresh}));return o}
-
+async function authedGoogle(){const t=await getGoogleTokensFromPostgres();if(!t)return null;const o=oauth();o.setCredentials(t);o.on("tokens",fresh=>saveGoogleTokensToPostgres({...t,...fresh}));return o}
 app.get("/api/status",(req,res)=>res.json({ok:true,openai:Boolean(process.env.OPENAI_API_KEY),google:Boolean(getTokens()),model:process.env.OPENAI_MODEL||"gpt-5.6"}));
 app.get("/api/state",async(req,res)=>{
   try{
