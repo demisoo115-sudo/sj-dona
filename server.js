@@ -105,6 +105,35 @@ async function initDatabase(){
     )
   `);
 }
+async function loadDBFromPostgres(){
+  if(!pool) return loadDB();
+
+  try{
+    await initDatabase();
+
+    const result=await pool.query(
+      "SELECT data FROM sj_dona_state WHERE id = 1"
+    );
+
+    if(result.rows.length){
+      return result.rows[0].data;
+    }
+
+    const initial=loadDB();
+
+    await pool.query(
+      `INSERT INTO sj_dona_state (id,data)
+       VALUES (1,$1::jsonb)
+       ON CONFLICT (id) DO NOTHING`,
+      [JSON.stringify(initial)]
+    );
+
+    return initial;
+  }catch(e){
+    console.error("POSTGRES LOAD ERROR:",e);
+    return loadDB();
+  }
+}
 function saveDB(db){fs.mkdirSync(DATA,{recursive:true});fs.writeFileSync(DB,JSON.stringify(db,null,2))}
 function key(){const raw=(process.env.TOKEN_ENCRYPTION_KEY||"").trim();return raw?crypto.createHash("sha256").update(raw).digest():null}
 function encrypt(obj){const k=key();if(!k)throw new Error("TOKEN_ENCRYPTION_KEY is not set");const iv=crypto.randomBytes(12),c=crypto.createCipheriv("aes-256-gcm",k,iv),enc=Buffer.concat([c.update(JSON.stringify(obj),"utf8"),c.final()]),tag=c.getAuthTag();return Buffer.concat([iv,tag,enc]).toString("base64")}
