@@ -80,6 +80,8 @@ body{padding-bottom:160px!important;}
 <textarea id="profile" placeholder="DONA가 계속 참고할 개인/사업 기본정보를 적으세요. 예: 이번 달 최우선 목표, 자주 쓰는 업무 원칙, 중요한 프로젝트"></textarea>
 <div class="row" style="margin-top:8px"><button class="btn dark" onclick="saveProfile()">기억 저장</button><input id="briefTime" type="time" style="max-width:130px"><button class="btn light" onclick="enableNotify()">알림 허용</button></div>
 <p class="small">브리핑 시간은 앱이 실행 중일 때 브라우저 알림에 사용됩니다. 완전한 백그라운드 푸시는 별도 푸시 서버 구성이 필요합니다.</p>
+<div class="row" style="margin-top:12px"><button class="btn dark" onclick="downloadDonaBackup()">⬇ DONA 데이터 백업 다운로드</button></div>
+<p class="small">할 일·일정·메모·설정·파일 기록을 JSON 파일로 저장합니다. Google 로그인 토큰은 보안상 제외하며 실제 업로드 파일 원본과 PostgreSQL 전체 백업은 포함하지 않습니다. 백업 파일은 안전한 곳에 보관하세요.</p>
 </div></section>
 
 <section class="section" id="filesSec">
@@ -171,6 +173,22 @@ async function load(){
   state=await api("/api/state"); state.tasks??=[];state.events??=[];state.profile??={};state.settings??={briefTime:"08:00"};
   $("profile").value=state.profile.memory||"";$("briefTime").value=state.settings.briefTime||"08:00";
   render(); status(); getBrief(); loadWorkspace();
+}
+async function downloadDonaBackup(){
+  try{
+    const original=await api("/api/state");
+    const safe={...original};
+    delete safe.googleTokens;
+    const payload={backupFormat:"SJ_DONA_USER_DATA_V1",exportedAt:new Date().toISOString(),data:safe};
+    const blob=new Blob([JSON.stringify(payload,null,2)],{type:"application/json;charset=utf-8"});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement("a");
+    a.href=url;
+    a.download="SJ_DONA_backup_"+new Date().toISOString().slice(0,10)+".json";
+    document.body.appendChild(a);a.click();a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),60000);
+    alert("백업 다운로드를 요청했습니다. 휴대폰 다운로드 폴더에서 파일을 확인하세요.");
+  }catch(e){alert("백업 실패: "+e.message)}
 }
 async function save(){await api("/api/state",{method:"POST",body:JSON.stringify(state)})}
 function render(){
