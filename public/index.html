@@ -23,7 +23,7 @@ input,textarea,select{width:100%;border:1px solid var(--line);border-radius:12px
 @media(min-width:720px){.grid{grid-template-columns:repeat(4,1fr)}.quick{grid-template-columns:repeat(4,1fr)}}
 body{padding-bottom:160px!important;}
 
-.md-content{white-space:normal;overflow-wrap:anywhere}.md-content h2{font-size:1.18em;margin:12px 0 6px}.md-content h3{font-size:1.05em;margin:10px 0 5px}.md-content p{margin:0 0 8px}.md-content ul,.md-content ol{margin:6px 0 10px;padding-left:24px}.md-content li{margin:3px 0}.md-content strong{font-weight:750}
+.hero #brief.md-content{font-size:14px;line-height:1.55;white-space:normal}.md-content{white-space:normal;overflow-wrap:anywhere}.md-content h2{font-size:1.18em;margin:10px 0 5px}.md-content h3{font-size:1.05em;margin:8px 0 4px}.md-content p{margin:0 0 6px}.md-content ul,.md-content ol{margin:6px 0 10px;padding-left:24px}.md-content li{margin:3px 0}.md-content strong{font-weight:750}
 </style></head>
 <body>
 <div class="app">
@@ -194,7 +194,7 @@ function renderDonaMarkdown(id,value){
     const number=line.match(/^\s*\d+\.\s+(.+)$/);
     if(h){close();const tag="h"+h[1].length;html+="<"+tag+">"+inline(h[2])+"</"+tag+">";}
     else if(bullet||number){const tag=bullet?"ul":"ol";if(list!==tag){close();html+="<"+tag+">";list=tag}html+="<li>"+inline((bullet||number)[1])+"</li>";}
-    else{close();if(line.trim())html+="<p>"+inline(line)+"</p>";else html+="<br>";}
+    else{close();if(line.trim())html+="<p>"+inline(line)+"</p>";else if(!html.endsWith("<br>"))html+="<br>";}
   }
   close();el.classList.add("md-content");el.innerHTML=html;
 }
@@ -423,10 +423,7 @@ window.donaFileId = id;
 
 // DONA 대화창에 분석 결과 표시
 if(aiBox){
-  aiBox.textContent =
-    "📄 DONA 문서 분석 완료\n\n" +
-    answer +
-    "\n\n이 문서에 대해 계속 질문하실 수 있습니다.";
+  renderDonaMarkdown("answer", "### 📄 DONA 문서 분석 완료\n\n" + answer + "\n\n이 문서에 대해 계속 질문하실 수 있습니다.");
 }
 
 // DONA 입력창으로 이동
