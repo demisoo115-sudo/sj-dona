@@ -183,22 +183,23 @@ function esc(s){return String(s).replace(/[&<>"\']/g,m=>({"&":"&amp;","<":"&lt;"
 
 function renderDonaMarkdown(id,value){
   const el=document.getElementById(id);if(!el)return;
-  const raw=String(value??"").replace(/\\r\\n?/g,"\\n");
+  const raw=String(value??"").replace(/\r\n?/g,"\n");
   const safe=esc(raw);
-  const inline=t=>t.replace(/\\*\\*([^*\\n]+)\\*\\*/g,"<strong>$1</strong>");
-  const lines=safe.split("\\n");let html="",list="";
+  const inline=t=>t.replace(/\*\*([^*\n]+)\*\*/g,"<strong>$1</strong>");
+  const lines=safe.split("\n");let html="",list="";
   const close=()=>{if(list){html+="</"+list+">";list=""}};
   for(const line of lines){
-    const h=line.match(/^\\s*(#{2,3})\\s+(.+)$/);
-    const bullet=line.match(/^\\s*[-*]\\s+(.+)$/);
-    const number=line.match(/^\\s*\\d+\\.\\s+(.+)$/);
+    const h=line.match(/^\s*(#{2,3})\s+(.+)$/);
+    const bullet=line.match(/^\s*[-*]\s+(.+)$/);
+    const number=line.match(/^\s*\d+\.\s+(.+)$/);
     if(h){close();const tag="h"+h[1].length;html+="<"+tag+">"+inline(h[2])+"</"+tag+">";}
     else if(bullet||number){const tag=bullet?"ul":"ol";if(list!==tag){close();html+="<"+tag+">";list=tag}html+="<li>"+inline((bullet||number)[1])+"</li>";}
     else{close();if(line.trim())html+="<p>"+inline(line)+"</p>";else html+="<br>";}
   }
   close();el.classList.add("md-content");el.innerHTML=html;
 }
-\nasync function addTask(){const t=$("taskText").value.trim();if(!t)return;state.tasks.unshift({text:t,cat:$("cat").value,priority:$("priority").value,done:false,created:new Date().toISOString()});$("taskText").value="";await save();render()}
+
+async function addTask(){const t=$("taskText").value.trim();if(!t)return;state.tasks.unshift({text:t,cat:$("cat").value,priority:$("priority").value,done:false,created:new Date().toISOString()});$("taskText").value="";await save();render()}
 async function toggleTask(i){state.tasks[i].done=!state.tasks[i].done;await save();render()}
 async function delTask(i){state.tasks.splice(i,1);await save();render()}
 async function addEvent(){const d=$("eventDate").value,t=$("eventText").value.trim();if(!d||!t)return;state.events.push({date:d,time:$("eventTime").value,text:t});state.events.sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time));$("eventText").value="";await save();render()}
